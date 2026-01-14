@@ -1,10 +1,4 @@
-"""
-adapters.py - 模型加载和预测适配器
 
-加载的模型:
-  - 问卷模型: 3个pkl文件 (model, scaler, label_encoders)
-  - 图片模型: 1个keras模型文件
-"""
 from pathlib import Path
 import json
 import traceback
