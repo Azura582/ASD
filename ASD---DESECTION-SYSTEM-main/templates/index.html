@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>ASD Video Prediction</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <h1>ASD Detection System</h1>
+    <form method="POST" enctype="multipart/form-data">
+      <input type="file" name="video" accept="video/*" required>
+      <button type="submit">Predict</button>
+    </form>
+
+    {% if result %}
+      <div class="result-box">
+        <p><strong>Prediction:</strong> {{ result }}</p>
+        {% if result == "autistic" %}
+          <a href="{{ url_for('chatbot') }}" class="chat-button">Find severity level using our Chatbot</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

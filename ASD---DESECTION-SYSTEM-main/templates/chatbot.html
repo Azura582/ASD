@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>ASD Chatbot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <h2>Chatbot: Severity Level Detection</h2>
+
+    {% if submitted %}
+      <p><strong>Estimated Severity Level:</strong> {{ level }}</p>
+      <div class="tips">
+        {% if level == "Mild" %}
+          <p>Suggestion: Engage in mild therapy sessions and group play.</p>
+        {% elif level == "Moderate" %}
+          <p>Suggestion: Weekly behavior therapy and monitored activities.</p>
+        {% else %}
+          <p>Suggestion: Regular intensive therapies with a specialist.</p>
+        {% endif %}
+      </div>
+    {% else %}
+      <form method="POST">
+        {% for question in questions %}
+          <label>{{ question }}</label><br>
+          <input type="radio" name="q{{ loop.index0 }}" value="yes" required> Yes
+          <input type="radio" name="q{{ loop.index0 }}" value="no"> No
+          <br><br>
+        {% endfor %}
+        <button type="submit">Get Severity Level</button>
+      </form>
+    {% endif %}
+  </div>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!-- templates/result.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Prediction Result</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #eef2f3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        .result-box {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .result-box h3 {
+            font-size: 24px;
+            color: #333;
+        }
+        .result-box a {
+            margin-top: 20px;
+            display: inline-block;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="result-box">
+        <h3>Prediction: {{ prediction }}</h3>
+        {% if prediction == "autistic" %}
+            <p>Please proceed to assessment for severity and suggestions.</p>
+            <a href="{{ url_for('chatbot') }}">Continue to Chatbot</a>
+        {% else %}
+            <p>No signs of autism detected. Thank you for your submission.</p>
+        {% endif %}
+        <br><br>
+        <a href="{{ url_for('home') }}">Upload Another Video</a>
+    </div>
+</body>
+</html>

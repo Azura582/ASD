@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASD Prediction</title>
+</head>
+<body>
+    <h1>Video Prediction Result</h1>
+
+    {% if prediction_result %}
+        <p>Prediction: <strong>{{ prediction_result }}</strong></p>
+        <p>Confidence: {{ confidence | round(2) }}</p>
+    {% else %}
+        <p>No video uploaded yet.</p>
+    {% endif %}
+
+    {% if prediction_result == 'Autistic' %}
+        <h3>To find the level of severity, use our chatbot:</h3>
+        <a href="{{ url_for('chatbot') }}">
+            <button>Go to Chatbot</button>
+        </a>
+    {% endif %}
+
+    {% if video_path %}
+        <h2>Uploaded Video</h2>
+        <video width="320" height="240" controls>
+            <source src="{{ url_for( filename='uploads/' + video_path.split('/')[-1]) }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    {% endif %}
+
+    <br><br>
+    <a href="/">Go Back to Home</a>
+</body>
+</html>
