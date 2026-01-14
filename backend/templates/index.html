@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}ASD检测系统 - 首页{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="text-center mb-5">
+            <h1 class="text-white mb-3">
+                <i class="fas fa-brain fa-3x mb-3"></i><br>
+                自闭症谱系障碍智能检测系统
+            </h1>
+            <p class="text-white lead">基于AI的多模态ASD筛查工具</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- 问卷检测卡片 -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center p-5">
+                        <div class="mb-4">
+                            <i class="fas fa-clipboard-list fa-5x text-primary"></i>
+                        </div>
+                        <h3 class="card-title mb-3">问卷检测</h3>
+                        <p class="card-text text-muted mb-4">
+                            通过10个标准化问题评估儿童的ASD风险<br>
+                            基于行为观察和发展特征
+                        </p>
+                        <ul class="list-unstyled text-start mb-4">
+                            <li><i class="fas fa-check text-success me-2"></i> 10道标准化问题</li>
+                            <li><i class="fas fa-check text-success me-2"></i> 科学风险评分</li>
+                            <li><i class="fas fa-check text-success me-2"></i> 即时生成报告</li>
+                            <li><i class="fas fa-check text-success me-2"></i> 约3-5分钟完成</li>
+                        </ul>
+                        <a href="/survey" class="btn btn-primary btn-lg">
+                            <i class="fas fa-arrow-right me-2"></i>开始问卷
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图片检测卡片 -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center p-5">
+                        <div class="mb-4">
+                            <i class="fas fa-image fa-5x text-info"></i>
+                        </div>
+                        <h3 class="card-title mb-3">图片检测</h3>
+                        <p class="card-text text-muted mb-4">
+                            上传行为照片,AI识别典型自闭症行为模式<br>
+                            支持多种行为类型识别
+                        </p>
+                        <ul class="list-unstyled text-start mb-4">
+                            <li><i class="fas fa-check text-success me-2"></i> 行为模式识别</li>
+                            <li><i class="fas fa-check text-success me-2"></i> 深度学习分析</li>
+                            <li><i class="fas fa-check text-success me-2"></i> 置信度评分</li>
+                            <li><i class="fas fa-check text-success me-2"></i> 支持JPG/PNG格式</li>
+                        </ul>
+                        <a href="/image" class="btn btn-info btn-lg text-white">
+                            <i class="fas fa-upload me-2"></i>上传图片
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 使用说明 -->
+        <div class="card mt-5">
+            <div class="card-body">
+                <h4 class="card-title mb-3"><i class="fas fa-info-circle text-warning me-2"></i>使用说明</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>关于问卷检测</h5>
+                        <p class="text-muted">
+                            问卷基于国际通用的ASD筛查量表,通过观察儿童的日常行为和社交互动模式,
+                            评估自闭症谱系障碍的风险程度。适用于18个月至4岁的儿童。
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>关于图片检测</h5>
+                        <p class="text-muted">
+                            图片检测使用深度学习模型识别典型的自闭症行为模式,包括:
+                            头部撞击(head_banging)、原地旋转(spinning)、手部拍动(hand_flapping)等。
+                        </p>
+                    </div>
+                </div>
+                <div class="alert alert-warning mt-3" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>重要提示:</strong> 本系统仅供筛查参考,不能替代专业医疗诊断。
+                    如有疑虑,请及时咨询专业医生。
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

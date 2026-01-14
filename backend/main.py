@@ -1,64 +1,127 @@
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-import uvicorn
-from . import adapters
-import os
+"""
+FastAPI 后端 - 统一 ASD 检测 API
 
-app = FastAPI(title="Unified ASD Detection API")
+提供问卷评估和图片分类两个预测接口
+"""
+from fastapi import FastAPI, UploadFile, File, Body, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from typing import Dict, Any
+from . import adapters
+
+app = FastAPI(
+    title="ASD 检测统一 API",
+    description="整合问卷评估和图片行为分类的自闭症谱系障碍检测系统",
+    version="1.0.0"
+)
+
+# CORS 配置
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
 async def startup_event():
+    """启动时加载所有模型"""
+    print("正在加载模型...")
     adapters.load_adapters()
+    print("模型加载完成！")
+
+
+@app.get("/")
+async def root():
+    """根路径"""
+    return {
+        "message": "ASD 检测 API",
+        "docs": "/docs",
+        "endpoints": {
+            "health": "/health",
+            "models": "/models",
+            "survey": "/predict/survey",
+            "image": "/predict/image"
+        }
+    }
 
 
 @app.get("/health")
 async def health():
+    """健康检查"""
     return {"status": "ok"}
 
 
-@app.get("/version")
-async def version():
-    return {"app": "Unified ASD API", "backend_path": os.path.abspath(os.path.dirname(__file__))}
+@app.get("/models")
+async def models_info():
+    """获取已加载的模型信息"""
+    return adapters.get_models_info()
+
+
+@app.post("/predict/survey")
+async def predict_survey(payload: Dict[Any, Any] = Body(..., example={
+    "age": 36,
+    "sex": "Male",
+    "ethnicity": "Other",
+    "jaundice": "no",
+    "asd_history": "no",
+    "respondent": "parent",
+    "Q1": {"answer": "Yes"},
+    "Q2": {"answer": "No"},
+    "Q3": {"answer": "No"},
+    "Q4": {"answer": "Yes"},
+    "Q5": {"answer": "No"},
+    "Q6": {"answer": "No"},
+    "Q7": {"answer": "Yes"},
+    "Q8": {"answer": "No"},
+    "Q9": {"answer": "No"},
+    "Q10": {"answer": "Yes"}
+})):
+    """
+    问卷评估接口
+    
+    接受包含年龄、性别、种族等基本信息和10个问题答案的 JSON 数据，
+    返回 ASD 风险预测结果。
+    """
+    try:
+        result = adapters.predict_survey(payload)
+        if result and "error" not in result:
+            return JSONResponse(content=result)
+        else:
+            raise HTTPException(status_code=500, detail=result.get("detail", "预测失败"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/predict/image")
 async def predict_image(file: UploadFile = File(...)):
-    content = await file.read()
-    res = adapters.predict_image(content)
-    if res is None:
-        raise HTTPException(status_code=500, detail="image prediction failed")
-    return JSONResponse(res)
-
-
-@app.post("/predict/survey")
-async def predict_survey(request: Request):
-    # Debug: capture raw body to help diagnose malformed requests
-    raw = await request.body()
+    """
+    图片分类接口
+    
+    上传图片文件，返回自闭症行为分类结果（head_banging, spinning, hand_flapping）
+    """
     try:
-        payload = await request.json()
-    except Exception:
-        # not valid JSON
-        print("[debug] predict_survey received non-json body:", raw)
-        raise HTTPException(status_code=422, detail={"error": "request body is not valid JSON", "raw": raw.decode('utf-8', errors='replace')})
-
-    # Accept either {"data": {...}} or direct data dict
-    if isinstance(payload, dict) and "data" in payload and isinstance(payload["data"], dict):
-        data = payload["data"]
-    else:
-        data = payload
-
-    res = adapters.predict_survey({"data": data})
-    if res is None:
-        raise HTTPException(status_code=500, detail="survey prediction failed")
-    return JSONResponse(res)
-
-
-@app.get("/models")
-async def models_list():
-    return adapters.get_models_info()
+        # 读取文件内容
+        contents = await file.read()
+        
+        # 调用预测函数
+        result = adapters.predict_image(contents)
+        
+        if result and "error" not in result:
+            return JSONResponse(content=result)
+        else:
+            raise HTTPException(status_code=500, detail=result.get("detail", "预测失败"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "backend.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )

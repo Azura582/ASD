@@ -1,15 +1,9 @@
 """
-adapters.py
+adapters.py - 模型加载和预测适配器
 
-Purpose: Load and expose unified prediction functions for ASD detection models:
-  - load_adapters()
-  - predict_image(bytes) -> dict
-  - predict_survey(dict) -> dict
-  - get_models_info() -> dict
-
-Models loaded:
-  - Survey model: 3 pkl files (model, scaler, label_encoders) from AI ASD Detector
-  - Image model: 1 keras model file from autism-spectrum-disorder-detection-main
+加载的模型:
+  - 问卷模型: 3个pkl文件 (model, scaler, label_encoders)
+  - 图片模型: 1个keras模型文件
 """
 from pathlib import Path
 import json
@@ -18,56 +12,68 @@ from typing import Optional
 import os
 import warnings
 
-# Suppress sklearn version warnings
+# 抑制sklearn版本警告
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 
+# 强制使用CPU模式(避免GPU驱动问题)
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
-# Try multiple keras loaders (TF bundled or standalone)
+# 尝试多种keras加载方式
 load_model = None
-from keras.models import load_model as _keras_load_model
-load_model = _keras_load_model
+try:
+    from tensorflow.keras.models import load_model as _tf_load_model
+    load_model = _tf_load_model
+except Exception:
+    try:
+        from keras.models import load_model as _keras_load_model
+        load_model = _keras_load_model
+    except Exception:
+        load_model = None
 
 import joblib
 import numpy as np
 
+# 配置路径 - 使用 backend/models 目录
+BACKEND_DIR = Path(__file__).resolve().parent
+MODELS_DIR = BACKEND_DIR / "models"
+CONFIG_DIR = BACKEND_DIR / "config"
 
-ROOT = Path(__file__).resolve().parent  # backend directory
-SURVEY_MODEL_PKL = ROOT / "models" / "autism_model.pkl"
-SURVEY_SCALER_PKL = ROOT / "models" / "scaler.pkl"
-SURVEY_ENCODERS_PKL = ROOT / "models" / "label_encoders.pkl"
-IMAGE_MODEL_PATH = ROOT / "models" / "autism_behavior_mobilenet_v2.keras"
-CLASS_NAMES_PATH = ROOT / "config" / "class_names.json"
+# 模型文件路径
+SURVEY_MODEL_PKL = MODELS_DIR / "autism_model.pkl"
+SURVEY_SCALER_PKL = MODELS_DIR / "scaler.pkl"
+SURVEY_ENCODERS_PKL = MODELS_DIR / "label_encoders.pkl"
+IMAGE_MODEL_PATH = MODELS_DIR / "autism_behavior_mobilenet_v2.keras"
+CLASS_NAMES_PATH = CONFIG_DIR / "class_names.json"
 
-# Global model storage
+# 全局模型存储
 _survey_artifacts = None
 _image_model = None
 _class_names = []
 
 
 def load_adapters():
-    """Load all models and artifacts at startup"""
+    """启动时加载所有模型和artifacts"""
     global _survey_artifacts, _image_model, _class_names
     
-    # Load class names for image model
+    # 加载图片分类标签
     try:
         if CLASS_NAMES_PATH.exists():
             _class_names = json.loads(CLASS_NAMES_PATH.read_text())
         else:
             _class_names = []
-            print("[adapters] warn: class_names.json not found")
+            print(f"[adapters] 警告: class_names.json未找到于 {CLASS_NAMES_PATH}")
     except Exception as e:
         _class_names = []
-        print("[adapters] warn: failed to load class_names:", e)
+        print(f"[adapters] 警告: 加载class_names失败: {e}")
 
-    # Load survey artifacts (3 pkl files)
+    # 加载问卷模型artifacts (3个pkl文件)
     try:
         if SURVEY_MODEL_PKL.exists():
             model = joblib.load(str(SURVEY_MODEL_PKL))
             scaler = joblib.load(str(SURVEY_SCALER_PKL)) if SURVEY_SCALER_PKL.exists() else None
             label_encoders = joblib.load(str(SURVEY_ENCODERS_PKL)) if SURVEY_ENCODERS_PKL.exists() else {}
             
-            # Expected features from AI ASD Detector/Code/app.py
+            # 期望的特征列表(来自AI ASD Detector/Code/app.py)
             expected_features = [
                 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10',
                 'Age_Mons', 'Sex', 'Ethnicity', 'Jaundice', 'Family_mem_with_ASD', 'Who completed the test'
@@ -79,36 +85,36 @@ def load_adapters():
                 "label_encoders": label_encoders,
                 "expected_features": expected_features
             }
-            print("[adapters] ✓ survey model loaded (3 pkl files)")
+            print(f"[adapters] ✓ 问卷模型已加载 (3个pkl文件)")
         else:
             _survey_artifacts = None
-            print("[adapters] warn: survey model pkl not found at", SURVEY_MODEL_PKL)
+            print(f"[adapters] 警告: 问卷模型pkl未找到于 {SURVEY_MODEL_PKL}")
     except Exception as e:
         _survey_artifacts = None
-        print("[adapters] ERROR loading survey model:", e)
+        print(f"[adapters] 错误: 加载问卷模型失败: {e}")
         traceback.print_exc()
 
-    # Load keras image model
+    # 加载keras图片模型
     try:
         if load_model is None:
-            raise ImportError("keras load_model not available (install keras or tensorflow)")
+            raise ImportError("keras load_model不可用 (需安装keras或tensorflow)")
         
         if IMAGE_MODEL_PATH.exists():
             _image_model = load_model(str(IMAGE_MODEL_PATH), compile=False)
-            print("[adapters] ✓ image model loaded")
+            print(f"[adapters] ✓ 图片模型已加载")
         else:
             _image_model = None
-            print("[adapters] warn: image model not found at", IMAGE_MODEL_PATH)
+            print(f"[adapters] 警告: 图片模型未找到于 {IMAGE_MODEL_PATH}")
     except Exception as e:
         _image_model = None
-        print("[adapters] ERROR loading image model:", e)
+        print(f"[adapters] 错误: 加载图片模型失败: {e}")
         traceback.print_exc()
 
-    print(f"[adapters] load complete - survey: {bool(_survey_artifacts)}, image: {bool(_image_model)}, classes: {len(_class_names)}")
+    print(f"[adapters] 加载完成 - 问卷: {bool(_survey_artifacts)}, 图片: {bool(_image_model)}, 类别数: {len(_class_names)}")
 
 
 def get_models_info():
-    """Return status of loaded models"""
+    """返回已加载模型的状态"""
     return {
         "survey_model_loaded": bool(_survey_artifacts),
         "image_model_loaded": bool(_image_model),
@@ -119,17 +125,17 @@ def get_models_info():
 
 def predict_image(image_bytes: bytes) -> Optional[dict]:
     """
-    Predict autism behavior from image bytes.
-    Returns: {"label": str, "score": float, "raw": list}
+    从图片字节流预测自闭症行为
+    返回: {"label": str, "score": float, "raw": list}
     """
     if _image_model is None:
-        return {"error": "image model not loaded"}
+        return {"error": "图片模型未加载"}
     
     try:
         from PIL import Image
         from io import BytesIO
         
-        # Get model input shape
+        # 获取模型输入尺寸
         try:
             inp_shape = None
             if hasattr(_image_model, 'input_shape') and _image_model.input_shape is not None:
@@ -145,15 +151,15 @@ def predict_image(image_bytes: bytes) -> Optional[dict]:
         except Exception:
             target_h = target_w = 128
 
-        # Preprocess image
+        # 预处理图片
         img = Image.open(BytesIO(image_bytes)).convert("RGB").resize((target_w, target_h))
         x = np.array(img).astype("float32") / 255.0
         x = np.expand_dims(x, axis=0)
 
-        # Predict
-        preds = _image_model.predict(x)
+        # 预测
+        preds = _image_model.predict(x, verbose=0)
         
-        # Extract prediction
+        # 提取预测结果
         if hasattr(preds, 'shape') and len(preds.shape) == 2:
             probs = preds[0]
         else:
@@ -166,11 +172,12 @@ def predict_image(image_bytes: bytes) -> Optional[dict]:
         return {
             "label": label,
             "score": score,
-            "raw": preds.tolist()
+            "confidence": f"{score*100:.2f}%",
+            "all_probabilities": {_class_names[i]: float(probs[i]) for i in range(len(_class_names))} if len(_class_names) == len(probs) else {}
         }
     except Exception as e:
         return {
-            "error": "image prediction failed",
+            "error": "图片预测失败",
             "detail": str(e),
             "trace": traceback.format_exc()
         }
@@ -178,9 +185,9 @@ def predict_image(image_bytes: bytes) -> Optional[dict]:
 
 def predict_survey(payload: dict) -> Optional[dict]:
     """
-    Predict autism risk from survey responses.
+    从问卷响应预测自闭症风险
     
-    Expected payload format:
+    期望的payload格式:
     {
       "data": {
         "age": int,
@@ -195,7 +202,7 @@ def predict_survey(payload: dict) -> Optional[dict]:
       }
     }
     
-    Returns: {
+    返回: {
       "prediction": str,
       "risk_questions": list,
       "score": int,
@@ -203,7 +210,7 @@ def predict_survey(payload: dict) -> Optional[dict]:
     }
     """
     if _survey_artifacts is None:
-        return {"error": "survey model not loaded"}
+        return {"error": "问卷模型未加载"}
     
     try:
         model = _survey_artifacts["model"]
@@ -211,10 +218,10 @@ def predict_survey(payload: dict) -> Optional[dict]:
         label_encoders = _survey_artifacts["label_encoders"]
         expected_features = _survey_artifacts["expected_features"]
         
-        # Extract data (support both {"data": {...}} and direct dict)
+        # 提取数据(支持{"data": {...}}或直接dict)
         data = payload.get("data", payload)
         
-        # Transform input following AI ASD Detector logic
+        # 转换输入(遵循AI ASD Detector逻辑)
         transformed = {
             "Age_Mons": int(data.get("age", 0)),
             "Sex": data.get("sex", ""),
@@ -224,21 +231,21 @@ def predict_survey(payload: dict) -> Optional[dict]:
             "Who completed the test": data.get("respondent", "")
         }
         
-        # Questions where "No" is concerning (value 1), "Yes" is not concerning (value 0)
+        # Q1-Q7, Q9: "No"=风险(值1), "Yes"=正常(值0)
         for i in [1, 2, 3, 4, 5, 6, 7, 9]:
             q_key = f"Q{i}"
             a_key = f"A{i}"
             answer = data.get(q_key, {}).get("answer", "No") if isinstance(data.get(q_key), dict) else "No"
             transformed[a_key] = 0 if answer == "Yes" else 1
         
-        # Questions where "Yes" is concerning (value 1), "No" is not concerning (value 0)
+        # Q8, Q10: "Yes"=风险(值1), "No"=正常(值0)
         for i in [8, 10]:
             q_key = f"Q{i}"
             a_key = f"A{i}"
             answer = data.get(q_key, {}).get("answer", "No") if isinstance(data.get(q_key), dict) else "No"
             transformed[a_key] = 1 if answer == "Yes" else 0
         
-        # Encode categorical features
+        # 编码分类特征
         for col in ['Sex', 'Ethnicity', 'Jaundice', 'Family_mem_with_ASD', 'Who completed the test']:
             if col in transformed and col in label_encoders:
                 try:
@@ -251,29 +258,29 @@ def predict_survey(payload: dict) -> Optional[dict]:
             else:
                 transformed[col] = 0
         
-        # Build feature vector
+        # 构建特征向量
         input_data = np.array([transformed.get(col, 0) for col in expected_features]).reshape(1, -1)
         
-        # Scale
+        # 缩放
         if scaler is not None:
             input_data = scaler.transform(input_data)
         
-        # Predict
+        # 预测
         prediction = model.predict(input_data)
         
-        # Calculate risk score
+        # 计算风险分数
         score = sum(transformed.get(f'A{i}', 0) for i in range(1, 11))
         risk_threshold = 3
         if score <= risk_threshold:
-            risk_level = "Low"
+            risk_level = "低风险"
         elif score <= 7:
-            risk_level = "Medium"
+            risk_level = "中风险"
         else:
-            risk_level = "High"
+            risk_level = "高风险"
         
-        risk_questions = [f'A{i}' for i in range(1, 11) if transformed.get(f'A{i}', 0) == 1]
+        risk_questions = [f'Q{i}' for i in range(1, 11) if transformed.get(f'A{i}', 0) == 1]
         
-        # Decode prediction label
+        # 解码预测标签
         pred_label_encoder = label_encoders.get('Class/ASD Traits ', None)
         if pred_label_encoder is not None:
             try:
@@ -291,7 +298,7 @@ def predict_survey(payload: dict) -> Optional[dict]:
         }
     except Exception as e:
         return {
-            "error": "survey prediction failed",
+            "error": "问卷预测失败",
             "detail": str(e),
             "trace": traceback.format_exc()
         }

@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}问卷检测 - ASD检测系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .question-card {
+        transition: all 0.3s;
+    }
+    .question-card:hover {
+        transform: translateY(-5px);
+    }
+    .answer-btn {
+        width: 100%;
+        padding: 15px;
+        margin: 5px 0;
+        border-radius: 10px;
+        font-size: 18px;
+        transition: all 0.3s;
+    }
+    .answer-btn.selected {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #667eea;
+    }
+    .progress-bar-custom {
+        height: 8px;
+        border-radius: 10px;
+    }
+    .result-box {
+        display: none;
+        animation: fadeIn 0.5s;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="text-center mb-4">
+                    <i class="fas fa-clipboard-list text-primary me-2"></i>
+                    ASD问卷检测
+                </h2>
+                
+                <!-- 进度条 -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>完成进度</span>
+                        <span id="progress-text">0%</span>
+                    </div>
+                    <div class="progress">
+                        <div id="progress-bar" class="progress-bar bg-primary progress-bar-custom" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- 基本信息表单 -->
+                <div id="basic-info-section">
+                    <h4 class="mb-3">基本信息</h4>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">年龄(月)</label>
+                            <input type="number" class="form-control" id="age" placeholder="例如: 36" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">性别</label>
+                            <select class="form-select" id="sex" required>
+                                <option value="">请选择</option>
+                                <option value="Male">男</option>
+                                <option value="Female">女</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">种族</label>
+                            <select class="form-select" id="ethnicity" required>
+                                <option value="">请选择</option>
+                                <option value="Asian">亚洲</option>
+                                <option value="White">白种人</option>
+                                <option value="Black">黑种人</option>
+                                <option value="Others">其他</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">出生时有黄疸吗?</label>
+                            <select class="form-select" id="jaundice" required>
+                                <option value="">请选择</option>
+                                <option value="yes">是</option>
+                                <option value="no">否</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">家族中有ASD病史吗?</label>
+                            <select class="form-select" id="asd_history" required>
+                                <option value="">请选择</option>
+                                <option value="yes">是</option>
+                                <option value="no">否</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">填写人</label>
+                            <select class="form-select" id="respondent" required>
+                                <option value="">请选择</option>
+                                <option value="Parent">父母</option>
+                                <option value="Health care professional">医护人员</option>
+                                <option value="Self">本人</option>
+                                <option value="Others">其他</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-lg w-100" onclick="startQuestions()">
+                        <i class="fas fa-arrow-right me-2"></i>开始答题
+                    </button>
+                </div>
+
+                <!-- 问题列表 -->
+                <div id="questions-section" style="display: none;">
+                    {% for q in questions %}
+                    <div class="question-card mb-4" data-question="{{ q.id }}">
+                        <h5 class="mb-3">{{ loop.index }}. {{ q.text }}</h5>
+                        <div class="btn-group-vertical w-100" role="group">
+                            <button type="button" class="btn btn-outline-primary answer-btn" 
+                                    onclick="selectAnswer('{{ q.id }}', 'Yes', this)">
+                                <i class="fas fa-check-circle me-2"></i>是
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary answer-btn" 
+                                    onclick="selectAnswer('{{ q.id }}', 'No', this)">
+                                <i class="fas fa-times-circle me-2"></i>否
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <button class="btn btn-success btn-lg w-100 mt-3" id="submit-btn" 
+                            onclick="submitSurvey()" disabled>
+                        <i class="fas fa-paper-plane me-2"></i>提交问卷
+                    </button>
+                </div>
+
+                <!-- 结果显示 -->
+                <div id="result-section" class="result-box">
+                    <div class="alert" id="result-alert" role="alert">
+                        <h4 class="alert-heading"><i class="fas fa-chart-line me-2"></i>检测结果</h4>
+                        <hr>
+                        <div id="result-content"></div>
+                    </div>
+                    <button class="btn btn-primary w-100" onclick="location.reload()">
+                        <i class="fas fa-redo me-2"></i>重新检测
+                    </button>
+                </div>
+
+                <!-- 加载动画 -->
+                <div id="loading" style="display: none;" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="mt-2">正在分析...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let answers = {};
+let totalQuestions = {{ questions|length }};
+
+function startQuestions() {
+    // 验证基本信息
+    const age = $('#age').val();
+    const sex = $('#sex').val();
+    const ethnicity = $('#ethnicity').val();
+    const jaundice = $('#jaundice').val();
+    const asd_history = $('#asd_history').val();
+    const respondent = $('#respondent').val();
+    
+    if (!age || !sex || !ethnicity || !jaundice || !asd_history || !respondent) {
+        alert('请填写完整的基本信息');
+        return;
+    }
+    
+    $('#basic-info-section').hide();
+    $('#questions-section').show();
+    updateProgress();
+}
+
+function selectAnswer(questionId, answer, btn) {
+    answers[questionId] = answer;
+    
+    // 更新按钮样式
+    $(btn).closest('.btn-group-vertical').find('.answer-btn').removeClass('selected');
+    $(btn).addClass('selected');
+    
+    updateProgress();
+    
+    // 检查是否全部回答
+    if (Object.keys(answers).length === totalQuestions) {
+        $('#submit-btn').prop('disabled', false);
+    }
+}
+
+function updateProgress() {
+    const answered = Object.keys(answers).length;
+    const progress = Math.round((answered / totalQuestions) * 100);
+    $('#progress-bar').css('width', progress + '%');
+    $('#progress-text').text(progress + '%');
+}
+
+function submitSurvey() {
+    const payload = {
+        age: parseInt($('#age').val()),
+        sex: $('#sex').val(),
+        ethnicity: $('#ethnicity').val(),
+        jaundice: $('#jaundice').val(),
+        asd_history: $('#asd_history').val(),
+        respondent: $('#respondent').val()
+    };
+    
+    // 添加问题答案
+    for (let i = 1; i <= totalQuestions; i++) {
+        const qid = 'Q' + i;
+        payload[qid] = { answer: answers[qid] || 'No' };
+    }
+    
+    $('#questions-section').hide();
+    $('#loading').show();
+    
+    $.ajax({
+        url: '/api/survey',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function(result) {
+            $('#loading').hide();
+            displayResult(result);
+        },
+        error: function(xhr, status, error) {
+            $('#loading').hide();
+            alert('提交失败: ' + (xhr.responseJSON?.error || error));
+            $('#questions-section').show();
+        }
+    });
+}
+
+function displayResult(result) {
+    if (result.error) {
+        $('#result-alert').removeClass('alert-success alert-warning alert-danger')
+                         .addClass('alert-danger');
+        $('#result-content').html(`
+            <p><strong>错误:</strong> ${result.error}</p>
+            <p>${result.detail || ''}</p>
+        `);
+    } else {
+        let alertClass = 'alert-success';
+        if (result.risk_level === '高风险') alertClass = 'alert-danger';
+        else if (result.risk_level === '中风险') alertClass = 'alert-warning';
+        
+        $('#result-alert').removeClass('alert-success alert-warning alert-danger')
+                         .addClass(alertClass);
+        
+        const riskQuestions = result.risk_questions.map(q => 
+            `<span class="badge bg-secondary">${q}</span>`
+        ).join(' ');
+        
+        $('#result-content').html(`
+            <div class="row">
+                <div class="col-md-4 text-center mb-3">
+                    <h2 class="display-4">${result.score}</h2>
+                    <p class="text-muted">风险评分</p>
+                </div>
+                <div class="col-md-4 text-center mb-3">
+                    <h2 class="display-4">${result.risk_level}</h2>
+                    <p class="text-muted">风险等级</p>
+                </div>
+                <div class="col-md-4 text-center mb-3">
+                    <h2 class="display-4">${result.prediction}</h2>
+                    <p class="text-muted">预测结果</p>
+                </div>
+            </div>
+            <hr>
+            <p><strong>风险项目:</strong> ${riskQuestions || '无'}</p>
+            <p class="text-muted mb-0">
+                <i class="fas fa-info-circle me-2"></i>
+                此结果仅供参考，如有疑虑请咨询专业医生
+            </p>
+        `);
+    }
+    
+    $('#result-section').show();
+}
+</script>
+{% endblock %}
