@@ -23,11 +23,10 @@ backend/
 ###  启动后端服务
 
 ```bash
-# 激活虚拟环境
-source myenv/bin/activate
+# 启动虚拟环境
+
 
 # 启动 FastAPI 服务器
-cd /home/azura/code/medicine
 uvicorn backend.main:app 
 ```
 
@@ -35,70 +34,11 @@ uvicorn backend.main:app
 - **API 文档**: http://localhost:8000/docs (Swagger UI)
 - **API 根路径**: http://localhost:8000/
 
-
-## API 端点
-
-### 1. 健康检查
+### 前端启动
 ```bash
-GET /health
-```
-返回: `{"status": "ok"}`
-
-### 2. 模型状态
-```bash
-GET /models
-```
-返回当前加载的模型信息。
-
-### 3. 问卷评估
-```bash
-POST /predict/survey
-Content-Type: application/json
-
-{
-  "age": 36,
-  "sex": "Male",
-  "ethnicity": "Other",
-  "jaundice": "no",
-  "asd_history": "no",
-  "respondent": "parent",
-  "Q1": {"answer": "Yes"},
-  "Q2": {"answer": "No"},
-  ...
-  "Q10": {"answer": "Yes"}
-}
+python backend/webapp.py
 ```
 
-返回示例:
-```json
-{
-  "prediction": "Yes",
-  "risk_questions": ["Q2", "Q3", "Q5", "Q6", "Q9", "Q10"],
-  "score": 6,
-  "risk_level": "中风险"
-}
-```
-
-### 4. 图片分类
-```bash
-POST /predict/image
-Content-Type: multipart/form-data
-```
-
-上传图片文件，返回行为分类结果：
-
-```json
-{
-  "label": "spinning",
-  "score": 0.9272,
-  "confidence": "92.72%",
-  "all_probabilities": {
-    "head_banging": 0.0724,
-    "spinning": 0.9272,
-    "hand_flapping": 0.0004
-  }
-}
-```
 
 ## 技术栈
 
