@@ -5,3 +5,5 @@
 *.pkl
 *.ecl
 *.csv
+*.keras
+*/__pycache__/
