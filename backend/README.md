@@ -5,10 +5,10 @@
 
 ```
 backend/
-├── main.py              # FastAPI 主应用
+├── main.py              # FastAPI 后端界面
 ├── adapters.py          # 模型加载和预测适配器
-├── test_api.py          # API 完整测试脚本
 ├── requirements.txt     # Python 依赖
+|—— webapp.py            # 前端
 ├── models/              # 模型文件目录
 │   ├── autism_model.pkl           # 问卷预测模型
 │   ├── scaler.pkl                 # 特征缩放器
@@ -36,7 +36,7 @@ uvicorn backend.main:app
 - **API 根路径**: http://localhost:8000/
 
 
-## 📡 API 端点
+## API 端点
 
 ### 1. 健康检查
 ```bash

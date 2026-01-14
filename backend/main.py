@@ -1,8 +1,4 @@
-"""
-FastAPI 后端 - 统一 ASD 检测 API
 
-提供问卷评估和图片分类两个预测接口
-"""
 from fastapi import FastAPI, UploadFile, File, Body, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,7 +24,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """启动时加载所有模型"""
+    """启动时加载模型"""
     print("正在加载模型...")
     adapters.load_adapters()
     print("模型加载完成！")
@@ -36,7 +32,7 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """根路径"""
+    
     return {
         "message": "ASD 检测 API",
         "docs": "/docs",
@@ -51,13 +47,12 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """健康检查"""
     return {"status": "ok"}
 
 
 @app.get("/models")
 async def models_info():
-    """获取已加载的模型信息"""
+    
     return adapters.get_models_info()
 
 
@@ -80,12 +75,7 @@ async def predict_survey(payload: Dict[Any, Any] = Body(..., example={
     "Q9": {"answer": "No"},
     "Q10": {"answer": "Yes"}
 })):
-    """
-    问卷评估接口
     
-    接受包含年龄、性别、种族等基本信息和10个问题答案的 JSON 数据，
-    返回 ASD 风险预测结果。
-    """
     try:
         result = adapters.predict_survey(payload)
         if result and "error" not in result:
@@ -98,11 +88,7 @@ async def predict_survey(payload: Dict[Any, Any] = Body(..., example={
 
 @app.post("/predict/image")
 async def predict_image(file: UploadFile = File(...)):
-    """
-    图片分类接口
     
-    上传图片文件，返回自闭症行为分类结果（head_banging, spinning, hand_flapping）
-    """
     try:
         # 读取文件内容
         contents = await file.read()

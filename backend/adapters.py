@@ -6,13 +6,10 @@ from typing import Optional
 import os
 import warnings
 
-# 抑制sklearn版本警告
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 
-# 强制使用CPU模式(避免GPU驱动问题)
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
-# 尝试多种keras加载方式
 load_model = None
 try:
     from tensorflow.keras.models import load_model as _tf_load_model
@@ -27,7 +24,6 @@ except Exception:
 import joblib
 import numpy as np
 
-# 配置路径 - 使用 backend/models 目录
 BACKEND_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BACKEND_DIR / "models"
 CONFIG_DIR = BACKEND_DIR / "config"
@@ -46,7 +42,7 @@ _class_names = []
 
 
 def load_adapters():
-    """启动时加载所有模型和artifacts"""
+    
     global _survey_artifacts, _image_model, _class_names
     
     # 加载图片分类标签
@@ -60,14 +56,14 @@ def load_adapters():
         _class_names = []
         print(f"[adapters] 警告: 加载class_names失败: {e}")
 
-    # 加载问卷模型artifacts (3个pkl文件)
+    # 加载问卷模型artifacts
     try:
         if SURVEY_MODEL_PKL.exists():
             model = joblib.load(str(SURVEY_MODEL_PKL))
             scaler = joblib.load(str(SURVEY_SCALER_PKL)) if SURVEY_SCALER_PKL.exists() else None
             label_encoders = joblib.load(str(SURVEY_ENCODERS_PKL)) if SURVEY_ENCODERS_PKL.exists() else {}
             
-            # 期望的特征列表(来自AI ASD Detector/Code/app.py)
+            # 期望的特征列表
             expected_features = [
                 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10',
                 'Age_Mons', 'Sex', 'Ethnicity', 'Jaundice', 'Family_mem_with_ASD', 'Who completed the test'
@@ -108,7 +104,7 @@ def load_adapters():
 
 
 def get_models_info():
-    """返回已加载模型的状态"""
+    
     return {
         "survey_model_loaded": bool(_survey_artifacts),
         "image_model_loaded": bool(_image_model),
@@ -118,10 +114,7 @@ def get_models_info():
 
 
 def predict_image(image_bytes: bytes) -> Optional[dict]:
-    """
-    从图片字节流预测自闭症行为
-    返回: {"label": str, "score": float, "raw": list}
-    """
+   
     if _image_model is None:
         return {"error": "图片模型未加载"}
     
@@ -145,7 +138,7 @@ def predict_image(image_bytes: bytes) -> Optional[dict]:
         except Exception:
             target_h = target_w = 128
 
-        # 预处理图片
+        # 预处理
         img = Image.open(BytesIO(image_bytes)).convert("RGB").resize((target_w, target_h))
         x = np.array(img).astype("float32") / 255.0
         x = np.expand_dims(x, axis=0)
@@ -153,7 +146,7 @@ def predict_image(image_bytes: bytes) -> Optional[dict]:
         # 预测
         preds = _image_model.predict(x, verbose=0)
         
-        # 提取预测结果
+        # 预测结果
         if hasattr(preds, 'shape') and len(preds.shape) == 2:
             probs = preds[0]
         else:
@@ -178,31 +171,7 @@ def predict_image(image_bytes: bytes) -> Optional[dict]:
 
 
 def predict_survey(payload: dict) -> Optional[dict]:
-    """
-    从问卷响应预测自闭症风险
     
-    期望的payload格式:
-    {
-      "data": {
-        "age": int,
-        "sex": str,
-        "ethnicity": str,
-        "jaundice": str,
-        "asd_history": str,
-        "respondent": str,
-        "Q1": {"answer": "Yes"|"No"},
-        ...
-        "Q10": {"answer": "Yes"|"No"}
-      }
-    }
-    
-    返回: {
-      "prediction": str,
-      "risk_questions": list,
-      "score": int,
-      "risk_level": str
-    }
-    """
     if _survey_artifacts is None:
         return {"error": "问卷模型未加载"}
     
@@ -212,10 +181,10 @@ def predict_survey(payload: dict) -> Optional[dict]:
         label_encoders = _survey_artifacts["label_encoders"]
         expected_features = _survey_artifacts["expected_features"]
         
-        # 提取数据(支持{"data": {...}}或直接dict)
+        # 提取数据
         data = payload.get("data", payload)
         
-        # 转换输入(遵循AI ASD Detector逻辑)
+        # 转换输入
         transformed = {
             "Age_Mons": int(data.get("age", 0)),
             "Sex": data.get("sex", ""),
@@ -225,21 +194,18 @@ def predict_survey(payload: dict) -> Optional[dict]:
             "Who completed the test": data.get("respondent", "")
         }
         
-        # Q1-Q7, Q9: "No"=风险(值1), "Yes"=正常(值0)
         for i in [1, 2, 3, 4, 5, 6, 7, 9]:
             q_key = f"Q{i}"
             a_key = f"A{i}"
             answer = data.get(q_key, {}).get("answer", "No") if isinstance(data.get(q_key), dict) else "No"
             transformed[a_key] = 0 if answer == "Yes" else 1
         
-        # Q8, Q10: "Yes"=风险(值1), "No"=正常(值0)
         for i in [8, 10]:
             q_key = f"Q{i}"
             a_key = f"A{i}"
             answer = data.get(q_key, {}).get("answer", "No") if isinstance(data.get(q_key), dict) else "No"
             transformed[a_key] = 1 if answer == "Yes" else 0
         
-        # 编码分类特征
         for col in ['Sex', 'Ethnicity', 'Jaundice', 'Family_mem_with_ASD', 'Who completed the test']:
             if col in transformed and col in label_encoders:
                 try:
@@ -252,7 +218,6 @@ def predict_survey(payload: dict) -> Optional[dict]:
             else:
                 transformed[col] = 0
         
-        # 构建特征向量
         input_data = np.array([transformed.get(col, 0) for col in expected_features]).reshape(1, -1)
         
         # 缩放
