@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
@@ -6,10 +6,6 @@ from . import adapters
 import os
 
 app = FastAPI(title="Unified ASD Detection API")
-
-
-class SurveyPayload(BaseModel):
-    data: dict
 
 
 @app.on_event("startup")
@@ -36,20 +32,24 @@ async def predict_image(file: UploadFile = File(...)):
     return JSONResponse(res)
 
 
-@app.post("/predict/video")
-async def predict_video(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
-    # For large files you can return a job id and process in background
-    content = await file.read()
-    # immediate processing (synchronous) for simplicity
-    res = adapters.predict_video(content)
-    if res is None:
-        raise HTTPException(status_code=500, detail="video prediction failed")
-    return JSONResponse(res)
-
-
 @app.post("/predict/survey")
-async def predict_survey(payload: SurveyPayload):
-    res = adapters.predict_survey(payload.data)
+async def predict_survey(request: Request):
+    # Debug: capture raw body to help diagnose malformed requests
+    raw = await request.body()
+    try:
+        payload = await request.json()
+    except Exception:
+        # not valid JSON
+        print("[debug] predict_survey received non-json body:", raw)
+        raise HTTPException(status_code=422, detail={"error": "request body is not valid JSON", "raw": raw.decode('utf-8', errors='replace')})
+
+    # Accept either {"data": {...}} or direct data dict
+    if isinstance(payload, dict) and "data" in payload and isinstance(payload["data"], dict):
+        data = payload["data"]
+    else:
+        data = payload
+
+    res = adapters.predict_survey({"data": data})
     if res is None:
         raise HTTPException(status_code=500, detail="survey prediction failed")
     return JSONResponse(res)
