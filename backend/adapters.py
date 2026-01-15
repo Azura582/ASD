@@ -227,11 +227,11 @@ def predict_survey(payload: dict) -> Optional[dict]:
         score = sum(transformed.get(f'A{i}', 0) for i in range(1, 11))
         risk_threshold = 3
         if score <= risk_threshold:
-            risk_level = "低风险"
+            risk_level = "Low Risk"
         elif score <= 7:
-            risk_level = "中风险"
+            risk_level = "Medium Risk"
         else:
-            risk_level = "高风险"
+            risk_level = "High Risk"
         
         risk_questions = [f'Q{i}' for i in range(1, 11) if transformed.get(f'A{i}', 0) == 1]
         
