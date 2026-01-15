@@ -12,14 +12,10 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
 load_model = None
 try:
-    from tensorflow.keras.models import load_model as _tf_load_model
-    load_model = _tf_load_model
+    from keras.models import load_model as _keras_load_model
+    load_model = _keras_load_model
 except Exception:
-    try:
-        from keras.models import load_model as _keras_load_model
-        load_model = _keras_load_model
-    except Exception:
-        load_model = None
+    load_model = None
 
 import joblib
 import numpy as np
