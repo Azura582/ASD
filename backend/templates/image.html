@@ -136,6 +136,13 @@ $('#file-input').change(function(e) {
     handleFile(e.target.files[0]);
 });
 
+const uploadAreaEl = document.getElementById('upload-area');
+const fileInputEl = document.getElementById('file-input');
+if (uploadAreaEl && fileInputEl) {
+  uploadAreaEl.addEventListener('click', () => fileInputEl.click());
+  fileInputEl.addEventListener('change', (e) => handleFile(e.target.files[0]));
+}
+
 // Drag & drop events
 const uploadArea = document.getElementById('upload-area');
 
