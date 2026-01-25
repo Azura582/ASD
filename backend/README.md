@@ -45,25 +45,10 @@ python backend/webapp.py
 - **后端框架**: FastAPI 0.95.2
 - **Web服务器**: Uvicorn
 - **问卷模型**: XGBoost + scikit-learn (pkl格式)
-- **图片模型**: MobileNetV2 (Keras/TensorFlow)
+- **图片模型**: best(pytorch)
 - **图片处理**: Pillow
 - **数据处理**: NumPy, Pandas
 
-## 模型说明
-
-### 问卷模型
-- 输入: 年龄、性别、种族等基本信息 + ASD筛查问题
-- 输出: ASD风险预测 (Yes/No)、风险分数 (0-10)、风险等级 (低/中/高)
-- 文件: 3个pkl文件 (模型、缩放器、编码器)
-
-### 图片模型
-- 输入: RGB图片 (自动调整为128x128)
-- 输出: 3种自闭症行为分类
-  - head_banging (头部撞击)
-  - spinning (旋转)
-  - hand_flapping (手部拍打)
-- 架构: MobileNetV2
-- 文件: autism_behavior_mobilenet_v2.keras
 
 
 ## 使用 Swagger UI

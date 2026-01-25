@@ -1,7 +1,5 @@
 """
 adapters.py - 模型加载和预测适配器
-
-纯 PyTorch/Ultralytics YOLO 实现，不依赖 Keras/TensorFlow
 """
 from pathlib import Path
 import json
