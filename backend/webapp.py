@@ -20,18 +20,18 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-producti
 # API后端地址(FastAPI服务)
 API_BASE = os.environ.get("API_BASE", "http://localhost:8000")
 
-# 问卷问题列表(中文)
+# 问卷问题列表
 QUESTIONS = [
-    {"id": "Q1", "text": "Will the child look into your eyes?"},
-    {"id": "Q2", "text": "When you point to something on the other side of the room, does the child look over?"},
-    {"id": "Q3", "text": "Does the child like to climb onto objects (such as stairs)?"},
-    {"id": "Q4", "text": "Does the child like playing hide-and-seek?"},
-    {"id": "Q5", "text": "Does the child pretend to play (for example, pretending to drink tea from a toy teacup)?"},
-    {"id": "Q6", "text": "Does the child point to things they want with their index finger?"},
-    {"id": "Q7", "text": "Does the child point to things they're interested in using their index finger?"},
-    {"id": "Q8", "text": "Is the child interested in other children?"},
-    {"id": "Q9", "text": "Does the child show things to you?"},
-    {"id": "Q10", "text": "When you call your child's name, does he/she respond?"}
+    {"id": "Q1", "text": "孩子和你有眼神交流吗?"},
+    {"id": "Q2", "text": "当你指向房间另一边的东西时,孩子会看过去吗?"},
+    {"id": "Q3", "text": "孩子喜欢爬到物体上(如楼梯，桌椅)吗?"},
+    {"id": "Q4", "text": "孩子喜欢玩躲猫猫游戏吗?"},
+    {"id": "Q5", "text": "孩子会假装玩游戏吗(例如,假装从玩具茶杯里喝茶)?"},
+    {"id": "Q6", "text": "孩子会用食指指向他们想获得的东西吗?"},
+    {"id": "Q7", "text": "孩子会用食指指向他们感兴趣的东西吗?"},
+    {"id": "Q8", "text": "孩子对其他孩子感兴趣吗?"},
+    {"id": "Q9", "text": "孩子会向你展示东西吗?"},
+    {"id": "Q10", "text": "当你叫孩子的名字时,他/她会回应吗?"}
 ]
 
 

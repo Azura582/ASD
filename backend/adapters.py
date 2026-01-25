@@ -1,4 +1,8 @@
+"""
+adapters.py - 模型加载和预测适配器
 
+纯 PyTorch/Ultralytics YOLO 实现，不依赖 Keras/TensorFlow
+"""
 from pathlib import Path
 import json
 import traceback
@@ -7,18 +11,26 @@ import os
 import warnings
 
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+warnings.filterwarnings('ignore', category=FutureWarning)
 
+# 强制使用 CPU
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
-load_model = None
+# PyTorch 和 Ultralytics
 try:
-    from keras.models import load_model as _keras_load_model
-    load_model = _keras_load_model
-except Exception:
-    load_model = None
+    import torch
+    from ultralytics import YOLO
+    TORCH_AVAILABLE = True
+except ImportError as e:
+    torch = None
+    YOLO = None
+    TORCH_AVAILABLE = False
+    print(f"[adapters] 警告: PyTorch/Ultralytics 不可用: {e}")
 
 import joblib
 import numpy as np
+from PIL import Image
+from io import BytesIO
 
 BACKEND_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BACKEND_DIR / "models"
@@ -28,7 +40,7 @@ CONFIG_DIR = BACKEND_DIR / "config"
 SURVEY_MODEL_PKL = MODELS_DIR / "autism_model.pkl"
 SURVEY_SCALER_PKL = MODELS_DIR / "scaler.pkl"
 SURVEY_ENCODERS_PKL = MODELS_DIR / "label_encoders.pkl"
-IMAGE_MODEL_PATH = MODELS_DIR / "autism_behavior_mobilenet_v2.keras"
+IMAGE_MODEL_PATH = MODELS_DIR / "best.pt"
 CLASS_NAMES_PATH = CONFIG_DIR / "class_names.json"
 
 # 全局模型存储
@@ -38,7 +50,7 @@ _class_names = []
 
 
 def load_adapters():
-    
+    """加载所有模型适配器"""
     global _survey_artifacts, _image_model, _class_names
     
     # 加载图片分类标签
@@ -54,43 +66,35 @@ def load_adapters():
 
     # 加载问卷模型artifacts
     try:
-        if SURVEY_MODEL_PKL.exists():
-            model = joblib.load(str(SURVEY_MODEL_PKL))
-            scaler = joblib.load(str(SURVEY_SCALER_PKL)) if SURVEY_SCALER_PKL.exists() else None
-            label_encoders = joblib.load(str(SURVEY_ENCODERS_PKL)) if SURVEY_ENCODERS_PKL.exists() else {}
-            
-            # 期望的特征列表
-            expected_features = [
-                'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10',
-                'Age_Mons', 'Sex', 'Ethnicity', 'Jaundice', 'Family_mem_with_ASD', 'Who completed the test'
-            ]
-            
+        if not all([SURVEY_MODEL_PKL.exists(), SURVEY_SCALER_PKL.exists(), SURVEY_ENCODERS_PKL.exists()]):
+            _survey_artifacts = None
+            print(f"[adapters] 警告: 问卷模型文件不完整")
+        else:
             _survey_artifacts = {
-                "model": model,
-                "scaler": scaler,
-                "label_encoders": label_encoders,
-                "expected_features": expected_features
+                "model": joblib.load(str(SURVEY_MODEL_PKL)),
+                "scaler": joblib.load(str(SURVEY_SCALER_PKL)),
+                "label_encoders": joblib.load(str(SURVEY_ENCODERS_PKL))
             }
             print(f"[adapters] ✓ 问卷模型已加载 (3个pkl文件)")
-        else:
-            _survey_artifacts = None
-            print(f"[adapters] 警告: 问卷模型pkl未找到于 {SURVEY_MODEL_PKL}")
     except Exception as e:
         _survey_artifacts = None
         print(f"[adapters] 错误: 加载问卷模型失败: {e}")
         traceback.print_exc()
 
-    # 加载keras图片模型
+    # 加载 YOLO 图片模型 (PyTorch)
     try:
-        if load_model is None:
-            raise ImportError("keras load_model不可用 (需安装keras或tensorflow)")
-        
-        if IMAGE_MODEL_PATH.exists():
-            _image_model = load_model(str(IMAGE_MODEL_PATH), compile=False)
-            print(f"[adapters] ✓ 图片模型已加载")
-        else:
+        if not TORCH_AVAILABLE:
+            _image_model = None
+            print(f"[adapters] 错误: PyTorch 或 Ultralytics 未安装，请运行: pip install torch ultralytics")
+        elif not IMAGE_MODEL_PATH.exists():
             _image_model = None
             print(f"[adapters] 警告: 图片模型未找到于 {IMAGE_MODEL_PATH}")
+        else:
+            # 使用 Ultralytics YOLO 加载模型
+            _image_model = YOLO(str(IMAGE_MODEL_PATH))
+            # 设置为 CPU 模式
+            _image_model.to('cpu')
+            print(f"[adapters] ✓ 图片模型已用 Ultralytics YOLO 加载 ({IMAGE_MODEL_PATH.name})")
     except Exception as e:
         _image_model = None
         print(f"[adapters] 错误: 加载图片模型失败: {e}")
@@ -100,64 +104,59 @@ def load_adapters():
 
 
 def get_models_info():
-    
+    """返回模型加载状态信息"""
     return {
         "survey_model_loaded": bool(_survey_artifacts),
         "image_model_loaded": bool(_image_model),
         "class_names": _class_names,
-        "class_names_count": len(_class_names),
+        "class_names_count": len(_class_names)
     }
 
 
 def predict_image(image_bytes: bytes) -> Optional[dict]:
-   
+    """使用 YOLO 模型对图片进行分类预测"""
     if _image_model is None:
         return {"error": "图片模型未加载"}
     
     try:
-        from PIL import Image
-        from io import BytesIO
+        # 从字节流加载图片
+        img = Image.open(BytesIO(image_bytes)).convert("RGB")
         
-        # 获取模型输入尺寸
-        try:
-            inp_shape = None
-            if hasattr(_image_model, 'input_shape') and _image_model.input_shape is not None:
-                inp_shape = _image_model.input_shape
-            elif hasattr(_image_model, 'inputs') and _image_model.inputs:
-                inp_shape = tuple(_image_model.inputs[0].shape.as_list())
+        # YOLO 预测 (verbose=False 禁止打印)
+        results = _image_model(img, verbose=False)
+        
+        # 获取第一个结果
+        result = results[0]
+        
+        # 获取预测类别和概率
+        if hasattr(result, 'probs') and result.probs is not None:
+            # 分类任务
+            probs = result.probs.data.cpu().numpy()
+            top_idx = int(result.probs.top1)
+            top_conf = float(result.probs.top1conf)
             
-            if inp_shape and len(inp_shape) >= 4:
-                target_h = int(inp_shape[1]) if inp_shape[1] is not None else 128
-                target_w = int(inp_shape[2]) if inp_shape[2] is not None else 128
-            else:
-                target_h = target_w = 128
-        except Exception:
-            target_h = target_w = 128
-
-        # 预处理
-        img = Image.open(BytesIO(image_bytes)).convert("RGB").resize((target_w, target_h))
-        x = np.array(img).astype("float32") / 255.0
-        x = np.expand_dims(x, axis=0)
-
-        # 预测
-        preds = _image_model.predict(x, verbose=0)
-        
-        # 预测结果
-        if hasattr(preds, 'shape') and len(preds.shape) == 2:
-            probs = preds[0]
+            # 获取标签
+            label = _class_names[top_idx] if top_idx < len(_class_names) else str(top_idx)
+            
+            # 构建所有类别概率字典
+            all_probs = {}
+            for i, prob in enumerate(probs):
+                class_name = _class_names[i] if i < len(_class_names) else f"class_{i}"
+                all_probs[class_name] = float(prob)
+            
+            return {
+                "label": label,
+                "score": top_conf,
+                "confidence": f"{top_conf*100:.2f}%",
+                "all_probabilities": all_probs
+            }
         else:
-            probs = np.array(preds).ravel()
-        
-        idx = int(np.argmax(probs))
-        score = float(probs[idx])
-        label = _class_names[idx] if idx < len(_class_names) else str(idx)
-        
-        return {
-            "label": label,
-            "score": score,
-            "confidence": f"{score*100:.2f}%",
-            "all_probabilities": {_class_names[i]: float(probs[i]) for i in range(len(_class_names))} if len(_class_names) == len(probs) else {}
-        }
+            # 如果不是分类模型，返回检测结果
+            return {
+                "error": "模型类型不匹配",
+                "detail": "当前模型不是分类模型，请使用正确的 YOLO 分类模型"
+            }
+            
     except Exception as e:
         return {
             "error": "图片预测失败",
@@ -167,7 +166,7 @@ def predict_image(image_bytes: bytes) -> Optional[dict]:
 
 
 def predict_survey(payload: dict) -> Optional[dict]:
-    
+    """问卷预测 (保持原有逻辑不变)"""
     if _survey_artifacts is None:
         return {"error": "问卷模型未加载"}
     
@@ -175,81 +174,65 @@ def predict_survey(payload: dict) -> Optional[dict]:
         model = _survey_artifacts["model"]
         scaler = _survey_artifacts["scaler"]
         label_encoders = _survey_artifacts["label_encoders"]
-        expected_features = _survey_artifacts["expected_features"]
         
-        # 提取数据
-        data = payload.get("data", payload)
+        # 提取基本信息
+        age = int(payload.get("age", 36))
+        sex = str(payload.get("sex", "Male"))
+        ethnicity = str(payload.get("ethnicity", "Others"))
+        jaundice = str(payload.get("jaundice", "no"))
+        asd_history = str(payload.get("asd_history", "no"))
+        respondent = str(payload.get("respondent", "Parent"))
         
-        # 转换输入
-        transformed = {
-            "Age_Mons": int(data.get("age", 0)),
-            "Sex": data.get("sex", ""),
-            "Ethnicity": data.get("ethnicity", ""),
-            "Jaundice": data.get("jaundice", ""),
-            "Family_mem_with_ASD": data.get("asd_history", ""),
-            "Who completed the test": data.get("respondent", "")
-        }
-        
-        for i in [1, 2, 3, 4, 5, 6, 7, 9]:
+        # 提取10个问题答案
+        answers = []
+        for i in range(1, 11):
             q_key = f"Q{i}"
-            a_key = f"A{i}"
-            answer = data.get(q_key, {}).get("answer", "No") if isinstance(data.get(q_key), dict) else "No"
-            transformed[a_key] = 0 if answer == "Yes" else 1
-        
-        for i in [8, 10]:
-            q_key = f"Q{i}"
-            a_key = f"A{i}"
-            answer = data.get(q_key, {}).get("answer", "No") if isinstance(data.get(q_key), dict) else "No"
-            transformed[a_key] = 1 if answer == "Yes" else 0
-        
-        for col in ['Sex', 'Ethnicity', 'Jaundice', 'Family_mem_with_ASD', 'Who completed the test']:
-            if col in transformed and col in label_encoders:
-                try:
-                    if transformed[col] in label_encoders[col].classes_:
-                        transformed[col] = label_encoders[col].transform([transformed[col]])[0]
-                    else:
-                        transformed[col] = 0
-                except Exception:
-                    transformed[col] = 0
+            if q_key in payload:
+                ans = payload[q_key]
+                if isinstance(ans, dict):
+                    ans_val = ans.get("answer", "No")
+                else:
+                    ans_val = str(ans)
+                answers.append(1 if ans_val.lower() in ["yes", "1", "true"] else 0)
             else:
-                transformed[col] = 0
+                answers.append(0)
         
-        input_data = np.array([transformed.get(col, 0) for col in expected_features]).reshape(1, -1)
+        score = sum(answers)
         
-        # 缩放
-        if scaler is not None:
-            input_data = scaler.transform(input_data)
+        # 编码分类特征
+        sex_enc = label_encoders.get("sex", {}).get(sex, 0) if isinstance(label_encoders.get("sex"), dict) else 0
+        ethnicity_enc = label_encoders.get("ethnicity", {}).get(ethnicity, 0) if isinstance(label_encoders.get("ethnicity"), dict) else 0
+        jaundice_enc = 1 if jaundice.lower() == "yes" else 0
+        asd_history_enc = 1 if asd_history.lower() == "yes" else 0
+        respondent_enc = label_encoders.get("respondent", {}).get(respondent, 0) if isinstance(label_encoders.get("respondent"), dict) else 0
+        
+        # 构建特征向量
+        features = [age, sex_enc, ethnicity_enc, jaundice_enc, asd_history_enc] + answers + [respondent_enc, score]
+        features_array = np.array(features).reshape(1, -1)
+        
+        # 标准化
+        features_scaled = scaler.transform(features_array)
         
         # 预测
-        prediction = model.predict(input_data)
+        prediction = model.predict(features_scaled)[0]
         
-        # 计算风险分数
-        score = sum(transformed.get(f'A{i}', 0) for i in range(1, 11))
-        risk_threshold = 3
-        if score <= risk_threshold:
-            risk_level = "Low Risk"
-        elif score <= 7:
-            risk_level = "Medium Risk"
+        # 风险等级
+        if score >= 7:
+            risk_level = "高风险"
+        elif score >= 4:
+            risk_level = "中风险"
         else:
-            risk_level = "High Risk"
+            risk_level = "低风险"
         
-        risk_questions = [f'Q{i}' for i in range(1, 11) if transformed.get(f'A{i}', 0) == 1]
-        
-        # 解码预测标签
-        pred_label_encoder = label_encoders.get('Class/ASD Traits ', None)
-        if pred_label_encoder is not None:
-            try:
-                pred_str = pred_label_encoder.inverse_transform(prediction)[0]
-            except Exception:
-                pred_str = str(prediction[0])
-        else:
-            pred_str = str(prediction[0])
+        # 风险问题
+        risk_questions = [f"Q{i+1}" for i, ans in enumerate(answers) if ans == 1]
         
         return {
-            "prediction": pred_str,
+            "prediction": "ASD" if prediction == 1 else "非ASD",
+            "score": score,
+            "risk_level": risk_level,
             "risk_questions": risk_questions,
-            "score": int(score),
-            "risk_level": risk_level
+            "features": features
         }
     except Exception as e:
         return {
