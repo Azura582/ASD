@@ -8,6 +8,7 @@ webapp.py - Flask前端应用
 整合两种检测方式到统一界面
 """
 from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, url_for
+from flask_compress import Compress
 import requests
 import os
 from pathlib import Path
@@ -16,6 +17,9 @@ app = Flask(__name__,
             template_folder='templates',
             static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# 启用Gzip压缩,提升传输速度
+Compress(app)
 
 # API后端地址(FastAPI服务)
 API_BASE = os.environ.get("API_BASE", "http://localhost:8000")
@@ -172,5 +176,17 @@ def health():
         })
 
 
+@app.after_request
+def add_cache_headers(response):
+    """为静态资源添加缓存头,提升二次加载速度"""
+    if request.path.startswith('/static/'):
+        # 静态文件缓存7天
+        response.cache_control.max_age = 604800  # 7天 = 7*24*60*60秒
+        response.cache_control.public = True
+    return response
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # threaded=True 启用多线程，提高并发性能
+    # debug=False 在生产/测试环境关闭调试模式以提高性能
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

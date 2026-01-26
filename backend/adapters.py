@@ -204,8 +204,8 @@ def predict_survey(payload: dict) -> Optional[dict]:
         asd_history_enc = 1 if asd_history.lower() == "yes" else 0
         respondent_enc = label_encoders.get("respondent", {}).get(respondent, 0) if isinstance(label_encoders.get("respondent"), dict) else 0
         
-        # 构建特征向量
-        features = [age, sex_enc, ethnicity_enc, jaundice_enc, asd_history_enc] + answers + [respondent_enc, score]
+        # 构建特征向量 (不包括 score，模型期望 16 个特征)
+        features = [age, sex_enc, ethnicity_enc, jaundice_enc, asd_history_enc] + answers + [respondent_enc]
         features_array = np.array(features).reshape(1, -1)
         
         # 标准化
