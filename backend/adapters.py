@@ -125,7 +125,7 @@ def predict_image(image_bytes: bytes) -> Optional[dict]:
         
         # 获取第一个结果
         result = results[0]
-        
+        print(result.probs)
         # 获取预测类别和概率
         if hasattr(result, 'probs') and result.probs is not None:
             # 分类任务
@@ -182,6 +182,8 @@ def predict_survey(payload: dict) -> Optional[dict]:
         respondent = str(payload.get("respondent", "Parent"))
         
         # 提取10个问题答案
+        # 注意：题目询问的是正常发育行为，回答"No"表示缺失该行为（风险），记为1分
+        # 回答"Yes"表示具备该行为（正常），记为0分
         answers = []
         for i in range(1, 11):
             q_key = f"Q{i}"
@@ -191,7 +193,8 @@ def predict_survey(payload: dict) -> Optional[dict]:
                     ans_val = ans.get("answer", "No")
                 else:
                     ans_val = str(ans)
-                answers.append(1 if ans_val.lower() in ["yes", "1", "true"] else 0)
+                # No/缺失行为 = 1分(风险), Yes/具备行为 = 0分(正常)
+                answers.append(1 if ans_val.lower() in ["no", "0", "false"] else 0)
             else:
                 answers.append(0)
         
@@ -204,8 +207,9 @@ def predict_survey(payload: dict) -> Optional[dict]:
         asd_history_enc = 1 if asd_history.lower() == "yes" else 0
         respondent_enc = label_encoders.get("respondent", {}).get(respondent, 0) if isinstance(label_encoders.get("respondent"), dict) else 0
         
-        # 构建特征向量 (不包括 score，模型期望 16 个特征)
-        features = [age, sex_enc, ethnicity_enc, jaundice_enc, asd_history_enc] + answers + [respondent_enc]
+        # 构建特征向量 - 必须按照训练时的顺序！
+        # 训练时顺序: A1-A10, Age_Mons, Sex, Ethnicity, Jaundice, Family_mem_with_ASD, Who_completed_the_test
+        features = answers + [age, sex_enc, ethnicity_enc, jaundice_enc, asd_history_enc, respondent_enc]
         features_array = np.array(features).reshape(1, -1)
         
         # 标准化
